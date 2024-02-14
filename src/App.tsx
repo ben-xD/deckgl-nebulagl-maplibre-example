@@ -64,7 +64,7 @@ function App() {
       data: featureCollection,
       pickable: true,
       selectedFeatureIndexes,
-      mode: () => new DrawPolygonMode(),
+      mode: new DrawPolygonMode(),
       onClick: (pickInfo, hammerInput) => {
         console.log("click", { pickInfo, hammerInput });
       },
