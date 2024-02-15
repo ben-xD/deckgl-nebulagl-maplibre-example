@@ -13,7 +13,8 @@ import { TranslateMode } from "@nebula.gl/edit-modes";
 
 function App() {
   const mapContainer = useRef<HTMLDivElement>(null);
-  const mapboxLayerRef = useRef<MapboxLayer<EditableGeoJsonLayer>>(null);
+  const mapboxOverlayRef = useRef<MapboxOverlay>();
+  const geojsonLayerRef = useRef<EditableGeoJsonLayer>();
   const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<
     number[]
   >([]);
@@ -31,6 +32,21 @@ function App() {
                 [-3.9538920354414984, 50.02381515527125],
                 [0.6924470242123846, 49.670907578310306],
                 [4.827539042028292, 53.005294785865715],
+                [-3.24481898415803, 53.07589656487383],
+              ],
+            ],
+            type: "Polygon",
+          },
+        },
+        {
+          type: "Feature",
+          properties: {},
+          geometry: {
+            coordinates: [
+              [
+                [-3.24481898415803, 53.07589656487383],
+                [-3.9538920354414984, 50.02381515527125],
+                [0.6924470242123846, 49.670907578310306],
                 [-3.24481898415803, 53.07589656487383],
               ],
             ],
@@ -59,13 +75,11 @@ function App() {
 
     // adapted from https://nebula.gl/docs/api-reference/layers/editable-geojson-layer
     // Put the props directly inside MapboxLayer instead of EditableGeojsonLayer. map.addLayer(mapboxLayer). Editing modes worked here.
-    const maplibreLayer = new EditableGeoJsonLayer({
+    const geojsonLayer = new EditableGeoJsonLayer({
       opacity: 0.1,
       id: "maplibre-layer-wrapping-editable-geojson-layer",
       data: featureCollection,
       pickable: true,
-      // type is missing but this is important
-      type: EditableGeoJsonLayer,
       selectedFeatureIndexes: [],
       mode: TranslateMode,
       onClick: (pickInfo, hammerInput) => {
@@ -97,9 +111,10 @@ function App() {
       },
     });
     const overlayControl = new MapboxOverlay({
-      layers: [maplibreLayer],
+      layers: [geojsonLayer],
     });
-    mapboxLayerRef.current = overlayControl;
+    mapboxOverlayRef.current = overlayControl;
+    geojsonLayerRef.current = geojsonLayer;
     // docs: https://deck.gl/docs/api-reference/mapbox/mapbox-overlay
     // const deckOverlay = new MapboxOverlay({
     //   layers: [
@@ -162,10 +177,21 @@ function App() {
   }, []);
 
   useEffect(() => {
-    mapboxLayerRef.current!.setProps({
-      id: "maplibre-layer-wrapping-editable-geojson-layer",
+    console.log(`Setting selectedFeatureIndexes: ${selectedFeatureIndexes}`);
+    // setProps on the mapboxOverlay doesn't affect the layer
+    // Also get random errors: `Uncaught TypeError: params.changeFlags is undefined`
+    mapboxOverlayRef.current!.setProps({
+      // id: "maplibre-layer-wrapping-editable-geojson-layer",
       selectedFeatureIndexes,
     });
+
+    // setProps on the MapboxLayer does affect the layer, but translation still doesn't work?
+
+    // geojsonLayerRef.current?.updateState({
+    //   props: {
+    //     selectedFeatureIndexes,
+    //   },
+    // });
   }, [selectedFeatureIndexes]);
 
   useEffect(() => {
@@ -173,7 +199,7 @@ function App() {
       console.log(
         `feature changes. ${featureCollection?.features?.length} features`
       );
-      mapboxLayerRef.current!.setProps({
+      mapboxOverlayRef.current!.setProps({
         id: "maplibre-layer-wrapping-editable-geojson-layer",
         data: featureCollection,
       });
