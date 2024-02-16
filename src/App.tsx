@@ -1,61 +1,39 @@
 import { useEffect, useRef, useState } from "react";
 import { Map } from "maplibre-gl";
-import { MapboxLayer, MapboxOverlay } from "@deck.gl/mapbox/typed";
 import { EditableGeoJsonLayer } from "@nebula.gl/layers";
+import { MapboxOverlay } from "@deck.gl/mapbox/typed";
+import { GeoJsonLayer } from "@deck.gl/layers/typed";
 import type { FeatureCollection } from "geojson";
-import { TranslateMode } from "@nebula.gl/edit-modes";
-// Started from https://github.com/visgl/deck.gl/blob/8.9-release/examples/get-started/pure-js/mapbox/app.js
-// MapboxOverlay vs MapboxLayer? Layer is just a layer. Overlay
+import { DrawPolygonMode, ViewMode } from "@nebula.gl/edit-modes";
+import { circleOverIreland, polygonOverEngland } from "./features";
+import { polygonOverScotlandCollection } from "./featureCollections";
+import type { IControl } from "maplibre-gl";
 
-// source: Natural Earth http://www.naturalearthdata.com/ via geojson.xyz
-// const AIRPORTS =
-// "https://d2ad6b4ur7yvpq.cloudfront.net/naturalearth-3.3.0/ne_10m_airports.geojson";
+// When using the @deck.gl/mapbox module, and MapboxLayer and MapboxOverlay https://deck.gl/docs/api-reference/mapbox/overview
+// Mapbox is the root element and deck.gl is the child, with Mapbox handling all user inputs
+// it is recommended that you use deck.gl as the root element, so we are doing the opposite.
+
+// To debug deck.gl, run the following in the browser console, as per https://deck.gl/docs/developer-guide/debugging.
+// However, it makes the shapes dissapear and an error (`luma.gl: assertion failed.`)
+// deck.log.enable();
+// deck.log.level = 3; // or 1 or 2
 
 function App() {
+  console.log("render");
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapboxOverlayRef = useRef<MapboxOverlay>();
-  const geojsonLayerRef = useRef<EditableGeoJsonLayer>();
+  // const [getMode, setMode] = useState(() => DrawPolygonMode);
   const [selectedFeatureIndexes, setSelectedFeatureIndexes] = useState<
     number[]
   >([]);
   const [featureCollection, setFeatureCollection] = useState<FeatureCollection>(
     {
       type: "FeatureCollection",
-      features: [
-        {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            coordinates: [
-              [
-                [-3.24481898415803, 53.07589656487383],
-                [-3.9538920354414984, 50.02381515527125],
-                [0.6924470242123846, 49.670907578310306],
-                [4.827539042028292, 53.005294785865715],
-                [-3.24481898415803, 53.07589656487383],
-              ],
-            ],
-            type: "Polygon",
-          },
-        },
-        {
-          type: "Feature",
-          properties: {},
-          geometry: {
-            coordinates: [
-              [
-                [-3.24481898415803, 53.07589656487383],
-                [-3.9538920354414984, 50.02381515527125],
-                [0.6924470242123846, 49.670907578310306],
-                [-3.24481898415803, 53.07589656487383],
-              ],
-            ],
-            type: "Polygon",
-          },
-        },
-      ],
+      features: [circleOverIreland, polygonOverEngland],
     }
   );
+
+  const mapRef = useRef<Map>();
   useEffect(() => {
     const map = new Map({
       container: mapContainer.current!,
@@ -67,144 +45,83 @@ function App() {
       // attributionControl: false,
       zoom: 5,
     });
+    mapRef.current = map;
     map.dragPan.disable();
-    // new types can't set the type anymore...
-    // const editableGeojsonLayerInMapboxLayer = new MapboxLayer({type: EditableGeoJsonLayer});
-    // Also not possible:
-    // editableGeojsonLayerInMapboxLayer.type = EditableGeoJsonLayer;
-
-    // adapted from https://nebula.gl/docs/api-reference/layers/editable-geojson-layer
-    // Put the props directly inside MapboxLayer instead of EditableGeojsonLayer. map.addLayer(mapboxLayer). Editing modes worked here.
-    const geojsonLayer = new EditableGeoJsonLayer({
-      opacity: 0.1,
-      id: "maplibre-layer-wrapping-editable-geojson-layer",
-      data: featureCollection,
-      pickable: true,
-      selectedFeatureIndexes: [],
-      mode: TranslateMode,
-      onClick: (pickInfo, hammerInput) => {
-        setSelectedFeatureIndexes([pickInfo.index]);
-        console.log("click", { pickInfo, hammerInput });
-      },
-      onEdit: (
-        updatedData: FeatureCollection,
-        editType: string,
-        featureIndexes: number[],
-        editContext: any | null
-      ) => {
-        if (updatedData && updatedData.features) {
-          console.log("onEdit called with features", {
-            updatedData,
-            editType,
-            featureIndexes,
-            editContext,
-          });
-          setFeatureCollection(updatedData);
-        } else {
-          console.error("onEdit called with no features", {
-            updatedData,
-            editType,
-            featureIndexes,
-            editContext,
-          });
-        }
-      },
-    });
-    const overlayControl = new MapboxOverlay({
-      layers: [geojsonLayer],
-    });
-    mapboxOverlayRef.current = overlayControl;
-    geojsonLayerRef.current = geojsonLayer;
-    // docs: https://deck.gl/docs/api-reference/mapbox/mapbox-overlay
-    // const deckOverlay = new MapboxOverlay({
-    //   layers: [
-    //     editableGeoJsonLayer,
-    //     // new GeoJsonLayer({
-    //     //   id: "airports",
-    //     //   data: AIRPORTS,
-    //     //   // Styles
-    //     //   filled: true,
-    //     //   pointRadiusMinPixels: 2,
-    //     //   pointRadiusScale: 2000,
-    //     //   getPointRadius: (f) => 11 - f?.properties?.scalerank,
-    //     //   getFillColor: [200, 0, 80, 180],
-    //     //   // Interactive props
-    //     //   pickable: true,
-    //     //   autoHighlight: true,
-    //     //   onClick: (info) =>
-    //     //     // eslint-disable-next-line
-    //     //     info.object &&
-    //     //     alert(
-    //     //       `${info.object.properties.name} (${info.object.properties.abbrev})`
-    //     //     ),
-    //     // }),
-    //     // new ArcLayer({
-    //     //   id: "arcs",
-    //     //   data: AIR_PORTS,
-    //     //   dataTransform: (d) =>
-    //     //     d.features.filter((f) => f.properties.scalerank < 4),
-    //     //   // Styles
-    //     //   getSourcePosition: (f) => [-0.4531566, 51.4709959], // London
-    //     //   getTargetPosition: (f) => f.geometry.coordinates,
-    //     //   getSourceColor: [0, 128, 200],
-    //     //   getTargetColor: [200, 0, 80],
-    //     //   getWidth: 1,
-    //     // }),
-    //   ],
-    // });
-    // We can also setProps later
-    // deckOverlay.setProps({ layers: [editableGeoJsonLayer] });
-
-    // Interesting alternative: await map.once('load');
     map.on("load", () => {
-      // maplibre (Map#addControl's parameter IControl) and deck.gl (MapboxOverlay) don't 100% agree
-      map.addControl(overlayControl);
-      // How to add EditableGeojsonLayer to maplibre? Can't use the addLayer anymore.
-      // map.addLayer();
-      // Use addControl and MapboxOverlay, following https://maplibre.org/maplibre-gl-js/docs/examples/add-deckgl-layer-using-rest-api/
-      // editableGeoJsonLayer.updateState({
-      //   props: {
-      //     mode: new DrawPolygonMode(),
-      //   },
-      // });
-      // map.addControl(editableGeojsonLayerOverlay);
-      // addLayer takes an object, like in https://github.com/maplibre/maplibre-gl-js/pull/3429/files
-      // map.addLayer(editableGeoJsonLayer);
+      const mapboxOverlayControl = new MapboxOverlay({
+        // TYPEERROR 2:
+        layers: [editableGeojsonLayer, geojsonLayer],
+      });
+      // TYPEERROR 1: mapboxOverlayControl implements IControl from mapbox. But Maplibre's map.addControl() wants a IControl from maplibre. 👇🏼️
+      map.addControl(mapboxOverlayControl as unknown as IControl);
+      mapboxOverlayRef.current = mapboxOverlayControl;
+
+      mapboxOverlayControl;
     });
     return () => {
       map.remove();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    console.log(`Setting selectedFeatureIndexes: ${selectedFeatureIndexes}`);
-    // setProps on the mapboxOverlay doesn't affect the layer
-    // Also get random errors: `Uncaught TypeError: params.changeFlags is undefined`
-    mapboxOverlayRef.current!.setProps({
-      // id: "maplibre-layer-wrapping-editable-geojson-layer",
-      selectedFeatureIndexes,
-    });
+  const geojsonLayer = new GeoJsonLayer({
+    opacity: 0.1,
+    data: polygonOverScotlandCollection,
+    id: "geojson-layer-ben",
+    getFillColor: [255, 0, 0],
+    pickable: true,
+    mode: ViewMode,
+    onClick: (pickInfo, hammerInput) => {
+      console.log("click", { pickInfo, hammerInput, featureCollection });
+    },
+  });
 
-    // setProps on the MapboxLayer does affect the layer, but translation still doesn't work?
+  // TYPEERROR 3: EditableGeoJsonLayer constructor Expected 0 arguments, but got 1.
+  const editableGeojsonLayer = new EditableGeoJsonLayer({
+    opacity: 0.1,
+    id: "editable-geojson-layer-ben",
+    data: featureCollection,
+    getFillColor: [0, 255, 0],
+    pickable: true,
+    selectedFeatureIndexes: selectedFeatureIndexes,
+    mode: DrawPolygonMode,
+    onClick: (pickInfo, hammerInput) => {
+      console.log("click", { pickInfo, hammerInput, featureCollection });
+      setSelectedFeatureIndexes([pickInfo.index]);
+    },
+    onEdit: (
+      updatedData: any | undefined,
+      editType: string | undefined,
+      featureIndexes: number[] | undefined,
+      editContext: any | undefined
+      // updatedData: FeatureCollection,
+      // editType: string,
+      // featureIndexes: number[],
+      // editContext: any | null
+    ) => {
+      console.log(`onEdit`);
+      if (updatedData && updatedData.features) {
+        console.log("onEdit called with features", {
+          updatedData,
+          editType,
+          featureIndexes,
+          editContext,
+        });
+        setFeatureCollection(updatedData);
+      } else {
+        console.error("onEdit called with no features", {
+          updatedData,
+          editType,
+          featureIndexes,
+          editContext,
+        });
+      }
+    },
+  });
 
-    // geojsonLayerRef.current?.updateState({
-    //   props: {
-    //     selectedFeatureIndexes,
-    //   },
-    // });
-  }, [selectedFeatureIndexes]);
-
-  useEffect(() => {
-    if (featureCollection) {
-      console.log(
-        `feature changes. ${featureCollection?.features?.length} features`
-      );
-      mapboxOverlayRef.current!.setProps({
-        id: "maplibre-layer-wrapping-editable-geojson-layer",
-        data: featureCollection,
-      });
-    }
-  }, [featureCollection]);
+  mapboxOverlayRef.current?.setProps({
+    layers: [editableGeojsonLayer, geojsonLayer],
+  });
 
   return (
     <>
